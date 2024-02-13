@@ -10,6 +10,11 @@ Requirements
 
 [Setting up the Dev Environment](https://esp-rs.github.io/book/installation/index.html)
 
+### Linux
+
+- <https://github.com/WCHSoftGroup/ch343ser_linux>
+- <https://ubuntu.com/blog/how-to-sign-things-for-secure-boot>
+
 ### Winget
 
 - git
