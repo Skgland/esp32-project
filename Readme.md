@@ -11,12 +11,14 @@ Requirements
 [Setting up the Dev Environment](https://esp-rs.github.io/book/installation/index.html)
 
 ### Winget
+
 - git
 - python (3.8) 3.10 is too new at the time of writing
 
 ### Cargo
+
 - espup
-    - run espup install 
+  - run espup install
 - ldproxy
 - cargo-espflash
 - espflash
