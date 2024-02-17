@@ -1,8 +1,8 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, time::{Duration, Instant}};
 
 use display_interface_spi::SPIInterfaceNoCS;
 use embedded_graphics::{
-    image::{Image, ImageRaw, ImageRawBE},
+    image::{Image, ImageRaw},
     prelude::*,
 };
 use embedded_graphics_core::pixelcolor::{raw::ToBytes, Rgb565, Rgb888};
@@ -27,6 +27,13 @@ fn main() {
         println!("Got an Error {err}");
     }
 }
+
+// the display is in portrait mode so we need images 135 wide by 240 high
+static IMAGES: &[(&str, &[u8])] = &[
+    ("Qoi Logo", include_bytes!("../images/qoi_logo-135x240.qoi")),
+    ("Cube 4", include_bytes!("../images/Qube4-esp32.qoi")),
+    ("Honey", include_bytes!("../images/Honey.qoi"))
+];
 
 fn run() -> Result<(), Box<dyn Error>> {
     println!("Hello, world!");
@@ -66,62 +73,58 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut bl = PinDriver::input_output_od(unsafe { Gpio4::new() })?;
     bl.set_high()?;
 
-    static QOI_LOGO_DATA: &[u8] = include_bytes!("qoi_logo-240x135.qoi");
-    static CUBE4_DATA: &[u8] = include_bytes!("Qube4-esp32.qoi");
-    static mut QOI_LOGO: [u8; 240 * 135 * 2] = [0u8; 240 * 135 * 2];
-    static mut CUBE_4: [u8; 240 * 135 * 2] = [0u8; 240 * 135 * 2];
+    static mut IMAGE_BUFFER: [u8; 240 * 135 * 2] = [0u8; 240 * 135 * 2];
+    // Safety:
+    // - this is the only place a reference to IMAGE_BUFFER is taken
+    // - no concurrent calls to run are made
+    // - the reference taken does not escape the function
+    let image_buffer = unsafe {&mut IMAGE_BUFFER};
 
-    println!("Decoding Qoi Image Data");
+    let mut next_draw = Instant::now();
 
-    let qoi_logo_buffer = unsafe { &mut QOI_LOGO };
-    let cube_4_buffer = unsafe { &mut CUBE_4 };
+    for (image_name, image_data) in IMAGES.into_iter().cycle() {
 
-    let Some((qoi_logo_header, pixels)) = arqoii::QoiDecoder::new(QOI_LOGO_DATA.iter().copied())
-    else {
-        return Err(Box::<dyn Error>::from("Qoi Decoding Error"));
-    };
+        println!("Decoding {image_name} Image Data");
 
-    for (dest_pixel, src_pixel) in qoi_logo_buffer.chunks_exact_mut(2).zip(pixels) {
-        let be_pixel =
-            Rgb565::from(Rgb888::new(src_pixel.r, src_pixel.g, src_pixel.b)).to_be_bytes();
-        dest_pixel[0] = be_pixel[0];
-        dest_pixel[1] = be_pixel[1];
-    }
+        let Some(raw_image) = decode_qoi_image(image_data, image_buffer)
+        else {
+            return Err(Box::<dyn Error>::from("Qoi Decoding Error"));
+        };
 
-    let Some((cube4_header, pixels)) = arqoii::QoiDecoder::new(CUBE4_DATA.iter().copied()) else {
-        return Err(Box::<dyn Error>::from("Qoi Decoding Error"));
-    };
+        let image = Image::new(&raw_image, Point::zero());
 
-    for (dest_pixel, src_pixel) in cube_4_buffer.chunks_exact_mut(2).zip(pixels) {
-        let be_pixel =
-            Rgb565::from(Rgb888::new(src_pixel.r, src_pixel.g, src_pixel.b)).to_be_bytes();
-        dest_pixel[0] = be_pixel[0];
-        dest_pixel[1] = be_pixel[1];
-    }
+        sleep_until(next_draw);
 
+        println!("Displaying: {image_name}");
 
-    let raw_qoi_logo: ImageRawBE<Rgb565> = ImageRaw::new(qoi_logo_buffer, qoi_logo_header.width);
-    let qoi_logo_img = Image::new(&raw_qoi_logo, Point::zero());
-
-    let raw_cube_4_img: ImageRawBE<Rgb565> = ImageRaw::new(cube_4_buffer, cube4_header.width);
-    let cube_4_img = Image::new(&raw_cube_4_img, Point::zero());
-
-    loop {
-        println!("Displaying: Qoi Logo");
-
-        qoi_logo_img.draw(&mut display)
+        image.draw(&mut display)
             .map_err(|_| Box::<dyn Error>::from("draw image"))?;
 
-        std::thread::sleep(Duration::from_secs(5));
-
-        println!("Displaying: Cube 4");
-
-        cube_4_img.draw(&mut display)
-            .map_err(|_| Box::<dyn Error>::from("draw image"))?;
-
-        std::thread::sleep(Duration::from_secs(5));
+        next_draw = Instant::now() + Duration::from_secs(5);
     }
 
     #[allow(unreachable_code)]
     Ok(())
+}
+
+fn sleep_until(target: Instant) {
+    let now = Instant::now();
+    if now < target {
+        println!("Waiting for next image change!");
+        std::thread::sleep(target - now);
+    }
+}
+
+fn decode_qoi_image<'b>(qoi_data: &[u8], pixel_buffer: &'b mut[u8]) -> Option<ImageRaw<'b, Rgb565>> {
+
+    let (qoi_header, pixels) = arqoii::QoiDecoder::new(qoi_data.iter().copied())?;
+
+    for (dest_pixel, src_pixel) in pixel_buffer.chunks_exact_mut(2).zip(pixels) {
+        let be_pixel =
+            Rgb565::from(Rgb888::new(src_pixel.r, src_pixel.g, src_pixel.b)).to_be_bytes();
+        dest_pixel[0] = be_pixel[0];
+        dest_pixel[1] = be_pixel[1];
+    }
+
+    Some(ImageRaw::new(pixel_buffer, qoi_header.width))
 }
