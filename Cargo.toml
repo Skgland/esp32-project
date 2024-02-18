@@ -16,7 +16,7 @@ opt-level = "z"
 pio = ["esp-idf-sys/pio"]
 
 [dependencies]
-arqoii = "0.2.0"
+arqoii = "0.3.0"
 esp-idf-sys = { version = "0.34.0", features = ["binstart"] }
 esp-idf-hal = "0.43.0"
 mipidsi = "0.7.1"

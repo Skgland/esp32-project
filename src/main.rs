@@ -117,7 +117,7 @@ fn sleep_until(target: Instant) {
 
 fn decode_qoi_image<'b>(qoi_data: &[u8], pixel_buffer: &'b mut[u8]) -> Option<ImageRaw<'b, Rgb565>> {
 
-    let (qoi_header, pixels) = arqoii::QoiDecoder::new(qoi_data.iter().copied())?;
+    let (qoi_header, pixels) = arqoii::decode::QoiDecoder::new(qoi_data.iter().copied())?;
 
     for (dest_pixel, src_pixel) in pixel_buffer.chunks_exact_mut(2).zip(pixels) {
         let be_pixel =
