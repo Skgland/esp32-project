@@ -41,8 +41,10 @@ static IMAGES: &[(&str, &[u8])] = &[
 fn run() -> Result<(), Box<dyn Error>> {
     println!("Hello, world!");
 
-    let rst = PinDriver::input_output_od(unsafe { Gpio23::new() })?;
-    let dc = PinDriver::input_output_od(unsafe { Gpio16::new() })?;
+    let mut rst = PinDriver::input_output_od(unsafe { Gpio23::new() })?;
+    rst.set_pull(esp_idf_hal::gpio::Pull::Up)?;
+    let mut dc = PinDriver::input_output_od(unsafe { Gpio16::new() })?;
+    dc.set_pull(esp_idf_hal::gpio::Pull::Up)?;
     let mut delay = Ets;
 
     let sclk = unsafe { Gpio18::new() };
@@ -74,6 +76,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         .map_err(|err| Box::<dyn Error>::from(format!("{err:?}")))?;
 
     let mut bl = PinDriver::input_output_od(unsafe { Gpio4::new() })?;
+    bl.set_pull(esp_idf_hal::gpio::Pull::Up)?;
     bl.set_high()?;
 
     static mut IMAGE_BUFFER: [u8; 240 * 135 * 2] = [0u8; 240 * 135 * 2];
