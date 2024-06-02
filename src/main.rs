@@ -1,4 +1,7 @@
-use std::{error::Error, time::{Duration, Instant}};
+use std::{
+    error::Error,
+    time::{Duration, Instant},
+};
 
 use display_interface_spi::SPIInterfaceNoCS;
 use embedded_graphics::{
@@ -32,7 +35,7 @@ fn main() {
 static IMAGES: &[(&str, &[u8])] = &[
     ("Qoi Logo", include_bytes!("../images/qoi_logo-135x240.qoi")),
     ("Cube 4", include_bytes!("../images/Qube4-esp32.qoi")),
-    ("Honey", include_bytes!("../images/Honey.qoi"))
+    ("Honey", include_bytes!("../images/Honey.qoi")),
 ];
 
 fn run() -> Result<(), Box<dyn Error>> {
@@ -78,16 +81,14 @@ fn run() -> Result<(), Box<dyn Error>> {
     // - this is the only place a reference to IMAGE_BUFFER is taken
     // - no concurrent calls to run are made
     // - the reference taken does not escape the function
-    let image_buffer = unsafe {&mut IMAGE_BUFFER};
+    let image_buffer = unsafe { &mut *core::ptr::addr_of_mut!(IMAGE_BUFFER) };
 
     let mut next_draw = Instant::now();
 
     for (image_name, image_data) in IMAGES.into_iter().cycle() {
-
         println!("Decoding {image_name} Image Data");
 
-        let Some(raw_image) = decode_qoi_image(image_data, image_buffer)
-        else {
+        let Some(raw_image) = decode_qoi_image(image_data, image_buffer) else {
             return Err(Box::<dyn Error>::from("Qoi Decoding Error"));
         };
 
@@ -97,7 +98,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         println!("Displaying: {image_name}");
 
-        image.draw(&mut display)
+        image
+            .draw(&mut display)
             .map_err(|_| Box::<dyn Error>::from("draw image"))?;
 
         next_draw = Instant::now() + Duration::from_secs(5);
@@ -115,8 +117,10 @@ fn sleep_until(target: Instant) {
     }
 }
 
-fn decode_qoi_image<'b>(qoi_data: &[u8], pixel_buffer: &'b mut[u8]) -> Option<ImageRaw<'b, Rgb565>> {
-
+fn decode_qoi_image<'b>(
+    qoi_data: &[u8],
+    pixel_buffer: &'b mut [u8],
+) -> Option<ImageRaw<'b, Rgb565>> {
     let (qoi_header, pixels) = arqoii::decode::QoiDecoder::new(qoi_data.iter().copied())?;
 
     for (dest_pixel, src_pixel) in pixel_buffer.chunks_exact_mut(2).zip(pixels) {
