@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use display_interface_spi::SPIInterfaceNoCS;
+use display_interface_spi::SPIInterface;
 use embedded_graphics::{
     image::{Image, ImageRaw},
     prelude::*,
@@ -17,7 +17,7 @@ use esp_idf_hal::{
         Dma, SpiDeviceDriver, SpiDriver, SPI2,
     },
 };
-use mipidsi::Builder;
+use mipidsi::{models::ST7789, Builder};
 
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 
@@ -57,8 +57,8 @@ fn run() -> Result<(), Box<dyn Error>> {
         sdo,
         None::<AnyIOPin>,
         &DriverConfig::new().dma(
-            // Dma::Channel1(240 * 135 * 2 + 8), // 2 bytes per pixel: 5 bit red, 6 bit green, 5 bit blue
-            Dma::Channel1(0x1000), // must be multiple of 4 and in 1..=4096 i.e not 0 and <= 0x1000
+            Dma::Channel1(240 * 135 * 2 + 8), // 2 bytes per pixel: 5 bit red, 6 bit green, 5 bit blue
+                                              // Dma::Channel1(0x1000), // must be multiple of 4 and in 1..=4096 i.e not 0 and <= 0x1000
         ),
     )?;
 
@@ -66,9 +66,14 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let spi = SpiDeviceDriver::new(spi, Some(cs), &Config::new())?;
 
-    let di = SPIInterfaceNoCS::new(spi, dc);
-    let mut display = Builder::st7789_pico1(di)
-        .init(&mut delay, Some(rst))
+    let di = SPIInterface::new(spi, dc);
+
+    let mut display = Builder::new(ST7789, di)
+        .display_size(135, 240)
+        .display_offset(52, 40)
+        .invert_colors(mipidsi::options::ColorInversion::Inverted)
+        .reset_pin(rst)
+        .init(&mut delay)
         .map_err(|err| Box::<dyn Error>::from(format!("{err:?}")))?;
 
     display
