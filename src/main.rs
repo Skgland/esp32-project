@@ -153,7 +153,7 @@ fn run(config: &AppConfig) -> Result<(), ProgramError> {
 
     let mut next_draw = Instant::now();
 
-    for (image_name, image_data) in IMAGES.into_iter().cycle() {
+    for (image_name, image_data) in IMAGES.iter().cycle() {
         log::debug!("Decoding {image_name} Image Data");
 
         let Some(raw_image) = decode_qoi_image(image_data, image_buffer) else {
